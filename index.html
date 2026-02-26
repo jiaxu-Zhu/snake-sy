@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>贪吃蛇游戏 🐍</title>
     <style>
         * {
@@ -18,30 +18,35 @@
             min-height: 100vh;
             background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 10px;
+            overflow-x: hidden;
         }
         
         .game-container {
             text-align: center;
+            width: 100%;
+            max-width: 500px;
         }
         
         h1 {
             color: #4ecca3;
             margin-bottom: 10px;
-            font-size: 2.5rem;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
         
         .score-board {
             display: flex;
             justify-content: center;
-            gap: 30px;
+            gap: clamp(10px, 4vw, 30px);
             margin-bottom: 15px;
+            flex-wrap: wrap;
         }
         
         .score, .high-score {
             color: #fff;
-            font-size: 1.2rem;
-            padding: 8px 20px;
+            font-size: clamp(0.9rem, 3vw, 1.2rem);
+            padding: clamp(6px, 2vw, 8px) clamp(15px, 4vw, 20px);
             background: rgba(78, 204, 163, 0.2);
             border-radius: 20px;
             border: 2px solid #4ecca3;
@@ -52,12 +57,17 @@
             border-radius: 10px;
             box-shadow: 0 0 30px rgba(78, 204, 163, 0.3);
             background: #0f0f23;
+            width: 100%;
+            height: auto;
+            max-width: 400px;
+            display: block;
+            margin: 0 auto;
         }
         
         .controls {
             margin-top: 20px;
             color: #aaa;
-            font-size: 0.9rem;
+            font-size: clamp(0.8rem, 2.5vw, 0.9rem);
         }
         
         .controls p {
@@ -65,8 +75,8 @@
         }
         
         .btn {
-            padding: 12px 30px;
-            font-size: 1.1rem;
+            padding: clamp(10px, 3vw, 12px) clamp(20px, 5vw, 30px);
+            font-size: clamp(1rem, 3vw, 1.1rem);
             border: none;
             border-radius: 25px;
             cursor: pointer;
@@ -94,17 +104,20 @@
             border-radius: 20px;
             border: 3px solid #e53e3e;
             display: none;
+            z-index: 100;
+            width: 80%;
+            max-width: 400px;
         }
         
         .game-over h2 {
             color: #e53e3e;
-            font-size: 2rem;
+            font-size: clamp(1.5rem, 5vw, 2rem);
             margin-bottom: 20px;
         }
         
         .game-over p {
             color: #fff;
-            font-size: 1.2rem;
+            font-size: clamp(1rem, 3vw, 1.2rem);
             margin-bottom: 20px;
         }
         
@@ -112,36 +125,47 @@
         .mobile-controls {
             display: none;
             margin-top: 20px;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+            justify-content: center;
         }
         
         @media (max-width: 600px) {
             .mobile-controls {
                 display: grid;
-                grid-template-columns: repeat(3, 60px);
-                grid-template-rows: repeat(3, 60px);
-                gap: 5px;
-                justify-content: center;
             }
             
             .mobile-btn {
-                width: 60px;
-                height: 60px;
-                font-size: 1.5rem;
+                width: clamp(50px, 15vw, 60px);
+                height: clamp(50px, 15vw, 60px);
+                font-size: clamp(1.2rem, 4vw, 1.5rem);
                 border: none;
                 border-radius: 10px;
                 background: rgba(78, 204, 163, 0.3);
                 color: #fff;
                 cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
             }
             
             .mobile-btn:active {
                 background: rgba(78, 204, 163, 0.6);
+                transform: scale(0.95);
             }
             
             .up { grid-column: 2; grid-row: 1; }
             .left { grid-column: 1; grid-row: 2; }
             .right { grid-column: 3; grid-row: 2; }
             .down { grid-column: 2; grid-row: 3; }
+        }
+        
+        /* 防止移动端点击高亮 */
+        * {
+            -webkit-tap-highlight-color: transparent;
         }
     </style>
 </head>
@@ -173,8 +197,33 @@
         const highScoreEl = document.getElementById('highScore');
         const startBtn = document.getElementById('startBtn');
 
-        const gridSize = 20;
-        const tileCount = canvas.width / gridSize;
+        // 根据屏幕大小动态调整游戏参数
+        function getGameParams() {
+            const maxCanvasSize = Math.min(window.innerWidth - 20, 400);
+            const gridSize = Math.floor(maxCanvasSize / 20) * 20; // 确保能被20整除
+            const tileCount = Math.floor(gridSize / 20);
+            return { gridSize, tileCount, canvasSize: gridSize };
+        }
+
+        let gameParams = getGameParams();
+        let gridSize = gameParams.gridSize;
+        let tileCount = gameParams.tileCount;
+
+        // 调整画布大小
+        function resizeCanvas() {
+            const params = getGameParams();
+            gameParams = params;
+            gridSize = params.gridSize;
+            tileCount = params.tileCount;
+            canvas.width = params.canvasSize;
+            canvas.height = params.canvasSize;
+            
+            // 如果游戏正在运行，需要重新生成食物位置
+            if (snake.length > 0) {
+                spawnFood();
+            }
+            draw();
+        }
 
         let snake = [];
         let food = {};
@@ -191,9 +240,9 @@
 
         function initGame() {
             snake = [
-                { x: 5, y: 10 },
-                { x: 4, y: 10 },
-                { x: 3, y: 10 }
+                { x: Math.floor(tileCount / 2), y: Math.floor(tileCount / 2) },
+                { x: Math.floor(tileCount / 2) - 1, y: Math.floor(tileCount / 2) },
+                { x: Math.floor(tileCount / 2) - 2, y: Math.floor(tileCount / 2) }
             ];
             direction = { x: 1, y: 0 };
             nextDirection = { x: 1, y: 0 };
@@ -277,7 +326,7 @@
                     segment.y * gridSize + 1,
                     gridSize - 2,
                     gridSize - 2,
-                    5
+                    Math.max(2, gridSize / 5)
                 );
                 ctx.fill();
 
@@ -285,27 +334,27 @@
                 if (index === 0) {
                     ctx.fillStyle = '#fff';
                     const eyeOffset = gridSize / 4;
-                    const eyeSize = 3;
+                    const eyeSize = Math.max(2, gridSize / 8);
                     
                     if (direction.x === 1) {
                         ctx.beginPath();
-                        ctx.arc(segment.x * gridSize + gridSize - 6, segment.y * gridSize + eyeOffset + 2, eyeSize, 0, Math.PI * 2);
-                        ctx.arc(segment.x * gridSize + gridSize - 6, segment.y * gridSize + gridSize - eyeOffset - 2, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + gridSize - eyeOffset, segment.y * gridSize + eyeOffset, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + gridSize - eyeOffset, segment.y * gridSize + gridSize - eyeOffset, eyeSize, 0, Math.PI * 2);
                         ctx.fill();
                     } else if (direction.x === -1) {
                         ctx.beginPath();
-                        ctx.arc(segment.x * gridSize + 6, segment.y * gridSize + eyeOffset + 2, eyeSize, 0, Math.PI * 2);
-                        ctx.arc(segment.x * gridSize + 6, segment.y * gridSize + gridSize - eyeOffset - 2, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + eyeOffset, segment.y * gridSize + eyeOffset, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + eyeOffset, segment.y * gridSize + gridSize - eyeOffset, eyeSize, 0, Math.PI * 2);
                         ctx.fill();
                     } else if (direction.y === -1) {
                         ctx.beginPath();
-                        ctx.arc(segment.x * gridSize + eyeOffset + 2, segment.y * gridSize + 6, eyeSize, 0, Math.PI * 2);
-                        ctx.arc(segment.x * gridSize + gridSize - eyeOffset - 2, segment.y * gridSize + 6, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + eyeOffset, segment.y * gridSize + eyeOffset, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + gridSize - eyeOffset, segment.y * gridSize + eyeOffset, eyeSize, 0, Math.PI * 2);
                         ctx.fill();
                     } else {
                         ctx.beginPath();
-                        ctx.arc(segment.x * gridSize + eyeOffset + 2, segment.y * gridSize + gridSize - 6, eyeSize, 0, Math.PI * 2);
-                        ctx.arc(segment.x * gridSize + gridSize - eyeOffset - 2, segment.y * gridSize + gridSize - 6, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + eyeOffset, segment.y * gridSize + gridSize - eyeOffset, eyeSize, 0, Math.PI * 2);
+                        ctx.arc(segment.x * gridSize + gridSize - eyeOffset, segment.y * gridSize + gridSize - eyeOffset, eyeSize, 0, Math.PI * 2);
                         ctx.fill();
                     }
                 }
@@ -316,11 +365,11 @@
                 ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 ctx.fillStyle = '#4ecca3';
-                ctx.font = 'bold 30px Arial';
+                ctx.font = `bold ${Math.max(20, gridSize/4)}px Arial`;
                 ctx.textAlign = 'center';
                 ctx.fillText('已暂停', canvas.width / 2, canvas.height / 2);
-                ctx.font = '16px Arial';
-                ctx.fillText('按空格键继续', canvas.width / 2, canvas.height / 2 + 30);
+                ctx.font = `${Math.max(12, gridSize/8)}px Arial`;
+                ctx.fillText('按空格键继续', canvas.width / 2, canvas.height / 2 + gridSize/3);
             }
         }
 
@@ -382,14 +431,14 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
             ctx.fillStyle = '#e53e3e';
-            ctx.font = 'bold 40px Arial';
+            ctx.font = `bold ${Math.max(24, gridSize/3)}px Arial`;
             ctx.textAlign = 'center';
-            ctx.fillText('游戏结束!', canvas.width / 2, canvas.height / 2 - 20);
+            ctx.fillText('游戏结束!', canvas.width / 2, canvas.height / 2 - gridSize/4);
             
             ctx.fillStyle = '#fff';
-            ctx.font = '20px Arial';
-            ctx.fillText(`得分: ${score}`, canvas.width / 2, canvas.height / 2 + 20);
-            ctx.fillText('点击"开始游戏"重新开始', canvas.width / 2, canvas.height / 2 + 50);
+            ctx.font = `${Math.max(14, gridSize/6)}px Arial`;
+            ctx.fillText(`得分: ${score}`, canvas.width / 2, canvas.height / 2 + gridSize/8);
+            ctx.fillText('点击"开始游戏"重新开始', canvas.width / 2, canvas.height / 2 + gridSize/2.5);
             
             startBtn.textContent = '重新开始';
         }
@@ -443,7 +492,8 @@
 
         // 移动端控制
         document.querySelectorAll('.mobile-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
                 if (!isRunning) return;
                 
                 const dir = btn.dataset.dir;
@@ -462,11 +512,23 @@
                         break;
                 }
             });
+            
+            // 添加触摸事件支持
+            btn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                btn.click();
+            });
         });
 
         startBtn.addEventListener('click', startGame);
 
-        // 初始绘制
+        // 窗口大小改变时重新调整画布
+        window.addEventListener('resize', () => {
+            resizeCanvas();
+        });
+
+        // 初始设置
+        resizeCanvas();
         initGame();
         draw();
     </script>
